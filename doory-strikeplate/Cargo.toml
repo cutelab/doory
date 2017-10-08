@@ -1,0 +1,14 @@
+[package]
+authors = ["root"]
+name = "doory-strikeplate"
+version = "0.1.0"
+
+[dependencies]
+bincode = "0.8.0"
+hyper = "0.10.5"
+serde = "1.0.15"
+serde_derive = "1.0.15"
+serde_json = "1.0.3"
+
+[dependencies.doory-core]
+path = "../doory-core"

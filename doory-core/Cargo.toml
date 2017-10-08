@@ -1,0 +1,8 @@
+[package]
+authors = ["eV <ev@7pr.xyz>"]
+name = "doory-core"
+version = "0.1.0"
+
+[dependencies]
+serde = "1.0.15"
+serde_derive = "1.0.15"

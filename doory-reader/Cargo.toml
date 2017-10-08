@@ -1,0 +1,15 @@
+[package]
+authors = ["eV <ev@7pr.xyz>"]
+name = "doory-reader"
+version = "0.1.0"
+
+[dependencies]
+bincode = "0.8.0"
+chan = "0.1.19"
+chan-signal = "0.3.1"
+env_logger = "0.4.3"
+log = "0.3.8"
+nfc-oath = "0.1.0"
+
+[dependencies.doory-core]
+path = "../doory-core"
