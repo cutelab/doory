@@ -35,7 +35,7 @@ const NUM_BLINKS: u8 = 4;
 
 const OFF: [u8; 3] = [0, 0, 0];
 const RED: [u8; 3] = [255, 0, 0];
-//const GREEN: [u8; 3] = [0, 255, 0];
+const GREEN: [u8; 3] = [0, 255, 0];
 const BLUE: [u8; 3] = [0, 0, 255];
 
 const NUM_ROW: usize = 4;
@@ -56,10 +56,11 @@ app! {
     resources: {
         static COLOR: [u8; 3] = OFF;
         static BLINK_COUNT: u8 = 0;
+        static RESET: bool = false;
     },
 
     idle: {
-        resources: [TIM3, TIM4, BLINK_COUNT, COLOR],
+        resources: [TIM3, TIM4, BLINK_COUNT, COLOR, RESET],
     },
 
     tasks: {
@@ -69,7 +70,7 @@ app! {
         },
         TIM4: {
             path: timeout,
-            resources: [TIM3, TIM4, BLINK_COUNT, COLOR]
+            resources: [TIM3, TIM4, BLINK_COUNT, COLOR, RESET]
         },
     },
 }
@@ -119,6 +120,7 @@ fn init(p: init::Peripherals, _r: init::Resources) {
 fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
     let mut cdc_send_data: [u8; 16] = [0; 16];
     let mut i = 0;
+    let mut success_color = BLUE;
     loop {
         hal_delay(100);
         for col in 0..NUM_COL {
@@ -126,6 +128,17 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
             COL_PINS[col].set_low();
             hal_delay(10);
             for row in 0..NUM_ROW {
+                r.RESET.claim_mut(_t, |reset, _| {
+                    if **reset {
+                        for j in 0..cdc_send_data.len() {
+                            cdc_send_data[j] = 0;
+                        }
+                        i = 0;
+                        **reset = false;
+                        success_color = BLUE;
+                    }
+                });
+
                 if ROW_PINS[row].is_low() {
                     r.TIM4.claim(_t, |tim4, _| {
                         let timer = Timer(&**tim4);
@@ -136,12 +149,9 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
                     });
                     cdc_send_data[i] = KEYS[row][col] as u8;
 
-
-                    // FIXME send different color for nfc reader
-                    // if cdc_send_data[i] == '*' as u8 {
-                    // }
-
-                    if cdc_send_data[i] == '#' as u8 {
+                    if cdc_send_data[i] == '*' as u8 {
+                        success_color = GREEN;
+                    } else if cdc_send_data[i] == '#' as u8 {
                         r.TIM4.claim(_t, |tim4, _| {
                             let timer = Timer(&**tim4);
                             timer.pause();
@@ -150,7 +160,7 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
                             **blink_count = 0;
                         });
                         r.COLOR.claim_mut(_t, |color, _| {
-                            **color = BLUE;
+                            **color = success_color;
                         });
                         r.TIM3.claim(_t, |tim3, _| {
                             let timer = Timer(&**tim3);
@@ -161,19 +171,15 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
                         while !cdc_send(&mut cdc_send_data, i+1) {
                             hal_delay(100);
                         }
-                        for j in 0..cdc_send_data.len() {
-                            cdc_send_data[j] = 0;
-                        }
-                        i = 0;
+                        r.RESET.claim_mut(_t, |reset, _| {
+                            **reset = true;
+                        });
+                        continue
                     }
 
                     i = i + 1;
 
                     if i >= cdc_send_data.len()-2 {
-                        for j in 0..cdc_send_data.len() {
-                            cdc_send_data[j] = 0;
-                        }
-                        i = 0;
                         r.TIM4.claim(_t, |tim4, _| {
                             let timer = Timer(&**tim4);
                             timer.pause();
@@ -187,6 +193,9 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
                         r.TIM3.claim(_t, |tim3, _| {
                             let timer = Timer(&**tim3);
                             timer.resume();
+                        });
+                        r.RESET.claim_mut(_t, |reset, _| {
+                            **reset = true;
                         });
                     }
                 }
@@ -216,7 +225,6 @@ fn toggle(_t: &mut Threshold, r: TIM3::Resources) {
 }
 
 fn timeout(_t: &mut Threshold, r: TIM4::Resources) {
-    // FIXME Needs to reset the usb output buffer
     let timer = Timer(&**r.TIM4);
     timer.wait().unwrap();
     timer.pause();
@@ -230,6 +238,9 @@ fn timeout(_t: &mut Threshold, r: TIM4::Resources) {
     r.TIM3.claim(_t, |tim3, _| {
         let timer = Timer(&**tim3);
         timer.resume();
+    });
+    r.RESET.claim_mut(_t, |reset, _| {
+        **reset = true;
     });
 }
 
