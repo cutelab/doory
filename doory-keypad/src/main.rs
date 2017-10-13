@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(const_fn)]
 #![feature(proc_macro)]
+#![feature(compiler_builtins_lib)] 
 
 extern crate bluepill_usbcdc;
 extern crate r0;
@@ -8,14 +9,19 @@ extern crate r0;
 
 extern crate blue_pill;
 extern crate cortex_m_rtfm as rtfm;
+extern crate m;
 
-use bluepill_usbcdc::*;
-use blue_pill::gpio;
+extern crate compiler_builtins;
+
 use blue_pill::gpio::*;
+use blue_pill::gpio;
 use blue_pill::prelude::*;
 use blue_pill::time::{Seconds};
 use blue_pill::{Timer, Spi};
+use bluepill_usbcdc::*;
+use core::f32;
 use rtfm::{app, Resource, Threshold};
+use m::Float as _0;
 
 /* setup usb interrupts */
 
@@ -26,6 +32,11 @@ exception!(SVCALL, svc_handler);
 exception!(PENDSV, pend_sv_handler);
 exception!(SYS_TICK, systick_handler);
 interrupt!(CAN1_RX0, usb_lp_can1_rx0_irqhandler);
+
+extern "C" {
+    fn HAL_GetTick() -> u32;
+}
+fn millis() -> u32 { unsafe { HAL_GetTick() }}
 
 // These are "tuned" values, the calculation seems wrong
 const BLINK_PERIOD: Seconds = Seconds(2); 
@@ -60,7 +71,7 @@ app! {
     },
 
     idle: {
-        resources: [TIM3, TIM4, BLINK_COUNT, COLOR, RESET],
+        resources: [SPI1, TIM3, TIM4, BLINK_COUNT, COLOR, RESET],
     },
 
     tasks: {
@@ -121,12 +132,29 @@ fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
     let mut cdc_send_data: [u8; 16] = [0; 16];
     let mut i = 0;
     let mut success_color = BLUE;
+    let mut pixel: [u8; 3] = OFF;
     loop {
-        hal_delay(100);
+        
+        r.TIM3.claim(_t, |tim3, t| {
+            let timer = Timer(&**tim3);
+            if !timer.0.cr1.read().cen().is_enabled() {
+                let val = -1.0*(millis() as f32 / 4000.0*f32::consts::PI).sin().abs() + 1.1;
+                pixel[0] = (val/4.0*0.0) as u8;
+                pixel[1] = (val/4.0*255.0) as u8;
+                pixel[2] = (val/4.0*55.0) as u8;
+
+                r.SPI1.claim(t, |spi1, _| {
+                    let spi = Spi(&**spi1);
+                    set_pixel(spi, pixel);
+                });
+            }
+        });
+
+        hal_delay(50);
+
         for col in 0..NUM_COL {
             COL_PINS[col].set_mode(GPIOMode::OUTPUT);
             COL_PINS[col].set_low();
-            hal_delay(10);
             for row in 0..NUM_ROW {
                 r.RESET.claim_mut(_t, |reset, _| {
                     if **reset {
