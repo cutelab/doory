@@ -91,7 +91,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "blue-pill"
 version = "0.1.0"
-source = "git+https://github.com/evq/blue-pill#6502f1884b4dd9d3e32bb49ee1fe49652fef2e13"
+source = "git+https://github.com/evq/blue-pill#0944ee01978f2f7bd28826331a50bf011a46bed8"
 dependencies = [
  "cast 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "embedded-hal 0.1.0 (git+https://github.com/japaric/embedded-hal?rev=7d904f515d15fd5fe7ea34e18820ea83e2651fa2)",

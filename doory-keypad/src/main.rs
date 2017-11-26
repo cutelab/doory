@@ -16,8 +16,8 @@ extern crate compiler_builtins;
 use blue_pill::gpio::*;
 use blue_pill::gpio;
 use blue_pill::prelude::*;
-use blue_pill::time::{Seconds};
-use blue_pill::{Timer, Spi};
+use blue_pill::time::{Seconds, Milliseconds};
+use blue_pill::{Timer, Spi, Iwdg};
 use bluepill_usbcdc::*;
 use core::f32;
 use rtfm::{app, Resource, Threshold};
@@ -71,7 +71,7 @@ app! {
     },
 
     idle: {
-        resources: [SPI1, TIM3, TIM4, BLINK_COUNT, COLOR, RESET],
+        resources: [SPI1, TIM3, TIM4, BLINK_COUNT, COLOR, RESET, IWDG],
     },
 
     tasks: {
@@ -126,14 +126,21 @@ fn init(p: init::Peripherals, _r: init::Resources) {
     for rp in &ROW_PINS {
         rp.set_mode(GPIOMode::INPUT_PULL_UP);
     }
+
+    // Watchdog Init
+    let watchdog = Iwdg(&*p.IWDG);
+    watchdog.init(Milliseconds(10000));
 }
 
 fn idle(_t: &mut Threshold, mut r: idle::Resources) -> ! {
+    let watchdog = Iwdg(&*r.IWDG);
+
     let mut cdc_send_data: [u8; 16] = [0; 16];
     let mut i = 0;
     let mut success_color = BLUE;
     let mut pixel: [u8; 3] = OFF;
     loop {
+        watchdog.reset();
         
         r.TIM3.claim(_t, |tim3, t| {
             let timer = Timer(&**tim3);
