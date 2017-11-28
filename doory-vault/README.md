@@ -59,5 +59,7 @@ vault token-create -policy keypad -orphan
 ```
 
 ## user totp secret / prefix creation
+```
 vault write totp/keys/ev generate=true account_name=ev issuer=cutelabs qr_size=0
 vault write secret/prefix/2626 key=ev
+```
