@@ -1,8 +1,8 @@
-all: ../target/mipsel-unknown-linux-musl/release/doory-keypad
+all: ../target/mipsel-unknown-linux-musl/release/doory-strikeplate
 
-../target/mipsel-unknown-linux-musl/release/doory-keypad: src/main.rs
+../target/mipsel-unknown-linux-musl/release/doory-strikeplate: src/main.rs
 	cargo build --release --target=mipsel-unknown-linux-musl
-	mipsel-openwrt-linux-strip ../target/mipsel-unknown-linux-musl/release/doory-keypad
+	mipsel-openwrt-linux-strip ../target/mipsel-unknown-linux-musl/release/doory-strikeplate
 
 clean:
 	cargo clean
