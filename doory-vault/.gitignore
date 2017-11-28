@@ -1,0 +1,12 @@
+# Generic ignores
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+
+# Project specific ignores
+tf/terraform.tfstate
+tf/terraform.tfstate.backup
+tf/.terraform

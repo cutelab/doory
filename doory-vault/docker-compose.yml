@@ -1,0 +1,9 @@
+version: "2"
+
+services:
+  vault:
+    container_name: vault
+    image: vault
+    build: .
+    ports:
+      - "8200:8200"
