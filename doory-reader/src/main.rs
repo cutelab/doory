@@ -1,23 +1,25 @@
 extern crate doory_core as core;
 
-#[macro_use] extern crate chan;
-#[macro_use] extern crate log;
 extern crate bincode;
+#[macro_use]
+extern crate chan;
 extern crate chan_signal;
 extern crate env_logger;
+#[macro_use]
+extern crate log;
 extern crate nfc_oath;
 
 use core::EntryAttempt;
 
-use bincode::{serialize, Infinite};
+use bincode::serialize;
 use chan_signal::Signal;
-use nfc_oath::{OathController, OathCredential, OathType, OathAlgo};
+use nfc_oath::{OathAlgo, OathController, OathCredential, OathType};
 use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
+use std::net::UdpSocket;
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
-use std::net::UdpSocket;
 
 fn read_lines(s: chan::Sender<String>) {
     let fname = "/dev/ttyACM0";
@@ -29,7 +31,7 @@ fn read_lines(s: chan::Sender<String>) {
     for line in buf_port.lines() {
         let line = match line {
             Ok(line) => line,
-            Err(_err) => continue
+            Err(_err) => continue,
         };
 
         s.send(line);
@@ -59,60 +61,50 @@ fn main() {
                     None => continue
                 };
 
-                let mut attempt = EntryAttempt{ pin:0, totp:0 };
-                let pin: String;
-                let totp: String;
+                let attempt: EntryAttempt;
+                let code: String;
 
                 let raw_code_parts: Vec<&str> = line.split("*").collect();
 
                 if raw_code_parts.len() == 1 {
-                    println!("polling for nfc token...");
-                    if !controller.poll(Some(Duration::from_secs(5))) {
-                        continue
-                    }
+                    let code = String::from(raw_code_parts[0]);
+                    attempt = EntryAttempt::Static(code);
 
-                    //let mut cred = OathCredential::new("Doory:doory@cutelab.house", OathType::TOTP, false, OathAlgo::SHA256);
-                    let mut cred = OathCredential::new("FidesmoOTPTutorial:tutorial@fidesmo.com", OathType::Totp, false, OathAlgo::Sha256);
-                    cred = controller.calculate(cred);
-                    let oathcode = match cred.code {
-                        Ok(oathcode) => oathcode,
-                        Err(err) => {
-                            println!("error while reading nfc credential: {}", err.to_string());
+                } else if raw_code_parts.len() == 2 {
+                    let pin = String::from(raw_code_parts[0]);
+
+                    if raw_code_parts[1].len() > 0 {
+                        code = String::from(raw_code_parts[1]);
+                    } else {
+                        println!("polling for nfc token...");
+                        if !controller.poll(Some(Duration::from_secs(5))) {
                             continue
                         }
-                    };
 
-                    pin = String::from(raw_code_parts[0]);
-                    totp = String::from(format!("{}", oathcode));
-                } else if raw_code_parts.len() == 2 {
-                    pin = String::from(raw_code_parts[0]);
-                    totp = String::from(raw_code_parts[1]);
+                        let mut cred = OathCredential::new("Doory:doory@cutelab.house", OathType::Totp, false, OathAlgo::Sha1);
+                        cred = controller.calculate(cred);
+                        let oathcode = match cred.code {
+                            Ok(oathcode) => oathcode,
+                            Err(err) => {
+                                println!("error while reading nfc credential: {}", err.to_string());
+                                continue
+                            }
+                        };
+                        code = String::from(format!("{}", oathcode));
+                    }
+                    attempt = EntryAttempt::OTP{pin: pin, code: code};
                 } else {
                     continue
                 }
-                attempt.pin = match pin.trim_matches(0 as char).parse::<u32>() {
-                    Ok(pin) => pin,
-                    Err(err) => {
-                        println!("error while parsing pin: {}", err.to_string());
-                        continue
-                    }
-                };
-                attempt.totp = match totp.trim_matches(0 as char).parse::<u32>() {
-                    Ok(totp) => totp,
-                    Err(err) => {
-                        println!("error while parsing totp: {}", err.to_string());
-                        continue
-                    }
-                };
 
-                let encoded: Vec<u8> = match serialize(&attempt, Infinite) {
+                let encoded: Vec<u8> = match serialize(&attempt) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         println!("error while serializing entry attempt: {}", err.to_string());
                         continue
                     }
                 };
-                debug!("sending pin {} totp {}", pin, totp);
+                debug!("sending {:?}", attempt);
                 socket.send_to(&encoded[..], "192.168.1.1:8000").expect("couldn't send data");
             }
         }

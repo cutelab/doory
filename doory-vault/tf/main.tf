@@ -7,6 +7,14 @@ resource "vault_auth_backend" "approle" {
   type = "approle"
 }
 
+resource "vault_generic_secret" "approle_tune" {
+  depends_on = ["vault_auth_backend.approle"]
+  path = "/sys/mounts/auth/approle/tune"
+  data_json = <<EOT
+  { "max_lease_ttl": "31536000" }
+EOT
+}
+
 resource "vault_mount" "totp" {
   path = "totp"
   type = "totp"
@@ -20,8 +28,12 @@ path "*" {
   capabilities = ["deny"]
 }
 
+path "secret/static/*" {
+  capabilities = ["list", "read"]
+}
+
 path "secret/prefix/*" {
-  capabilities = ["list", "read"] 
+  capabilities = ["list", "read"]
 }
 
 path "totp/code/*" {
@@ -35,7 +47,7 @@ resource "vault_generic_secret" "approle_keypad_role" {
   path = "auth/approle/role/keypad"
 
   data_json = <<EOT
-{"policies":"keypad"}
+{"policies":"keypad", "token_ttl":"8760h", "token_max_ttl": "8760h", "bind_secret_id": "false", "secret_id_bound_cidrs":["127.0.0.1/32"]}
 EOT
 }
 

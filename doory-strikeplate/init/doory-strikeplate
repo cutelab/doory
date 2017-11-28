@@ -7,6 +7,7 @@ PROG=/bin/doory-strikeplate
 
 start_service() {
 	procd_open_instance
+	procd_set_param env VAULT_TOKEN=FIXME
 	procd_set_param command "$PROG"
 	procd_close_instance
 }
