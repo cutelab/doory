@@ -6,6 +6,7 @@ extern crate serde_derive;
 pub enum EntryAttempt {
     Static(String),
     OTP { pin: String, code: String },
+    Card { account: String, code: String },
 }
 
 #[cfg(test)]

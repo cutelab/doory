@@ -1,6 +1,5 @@
 #![feature(alloc_system)]
 #![feature(const_fn)]
-#![feature(const_size_of)]
 
 extern crate doory_core as core;
 
@@ -81,11 +80,40 @@ impl From<serde_json::Error> for MyError {
 
 header! { (XVaultToken, "X-Vault-Token") => [String] }
 
+fn validate_code(account: &str, code: &str) -> Result<(), MyError> {
+    let client = Client::new();
+    let url = format!("http://127.0.0.1:8200/v1/totp/code/{}", account);
+
+    let mut body = serde_json::to_string(&VaultValidationReq {
+        code: code.to_string(),
+    })?;
+    let mut res = client
+        .post(&url)
+        .body(&body)
+        .header(XVaultToken(
+            env::var("VAULT_TOKEN").expect("VAULT_TOKEN must be defined"),
+        ))
+        .send()?;
+    body = String::new();
+    res.read_to_string(&mut body)?;
+    match res.status {
+        hyper::Ok => {
+            let resp: VaultValidationResp = serde_json::from_str(&body)?;
+            if !resp.data.valid {
+                return Err(MyError::Err("not valid".to_owned()));
+            }
+        }
+        _ => {
+            let resp: VaultErrorResp = serde_json::from_str(&body)?;
+            return Err(MyError::Err(resp.errors.join(", ").to_owned()));
+        }
+    };
+    Ok(())
+}
+
 fn validate(attempt: &EntryAttempt) -> Result<(), MyError> {
     match attempt {
         &EntryAttempt::Static(ref code) => {
-            let code = format!("{}", code);
-
             let client = Client::new();
             let url = format!("http://127.0.0.1:8200/v1/secret/static/{}", code);
             let mut res = client
@@ -106,11 +134,8 @@ fn validate(attempt: &EntryAttempt) -> Result<(), MyError> {
             Ok(())
         }
         &EntryAttempt::OTP { ref pin, ref code } => {
-            let prefix = format!("{}", pin);
-            let otp = format!("{}", code);
-
             let client = Client::new();
-            let mut url = format!("http://127.0.0.1:8200/v1/secret/prefix/{}", prefix);
+            let mut url = format!("http://127.0.0.1:8200/v1/secret/prefix/{}", pin);
             let mut res = client
                 .get(&url)
                 .header(XVaultToken(
@@ -127,36 +152,13 @@ fn validate(attempt: &EntryAttempt) -> Result<(), MyError> {
                 }
             }
             let resp: VaultKVResp = serde_json::from_str(&body)?;
-            let key = resp.data.key;
 
-            url = format!("http://127.0.0.1:8200/v1/totp/code/{}", key);
-
-            body = serde_json::to_string(&VaultValidationReq {
-                code: otp.to_owned(),
-            })?;
-            res = client
-                .post(&url)
-                .body(&body)
-                .header(XVaultToken(
-                    env::var("VAULT_TOKEN").expect("VAULT_TOKEN must be defined"),
-                ))
-                .send()?;
-            body = String::new();
-            res.read_to_string(&mut body)?;
-            match res.status {
-                hyper::Ok => {
-                    let resp: VaultValidationResp = serde_json::from_str(&body)?;
-                    if !resp.data.valid {
-                        return Err(MyError::Err("not valid".to_owned()));
-                    }
-                }
-                _ => {
-                    let resp: VaultErrorResp = serde_json::from_str(&body)?;
-                    return Err(MyError::Err(resp.errors.join(", ").to_owned()));
-                }
-            };
-            Ok(())
+            validate_code(&resp.data.key, code)
         }
+        &EntryAttempt::Card {
+            ref account,
+            ref code,
+        } => validate_code(account, code),
     }
 }
 
