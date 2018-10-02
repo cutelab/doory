@@ -1,0 +1,12 @@
+[package]
+authors = ["root"]
+name = "doory-cli"
+version = "0.1.0"
+
+[dependencies]
+bincode = "1.0.1"
+time = "0.1.40"
+otpauth-uri = "1.0.1"
+
+[dependencies.doory-core]
+path = "../doory-core"

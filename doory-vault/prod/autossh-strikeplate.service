@@ -1,0 +1,10 @@
+[Unit]
+Description=Sets up a persistent ssh connection to doory strikeplate
+After=network-online.target
+
+[Service]
+User=pi
+ExecStart=/usr/bin/autossh -M 0 -N -l pi strikeplate
+
+[Install]
+WantedBy=multi-user.target

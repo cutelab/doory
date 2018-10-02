@@ -1,0 +1,10 @@
+[Unit]
+Description=Doory vault server
+After=network-online.target
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/vault server -config=/etc/vault-server.hcl
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 [workspace]
-members = ["doory-core", "doory-keypad", "doory-reader", "doory-strikeplate"]
+members = ["doory-core", "doory-keypad", "doory-reader", "doory-strikeplate", "doory-cli"]
 
 [profile.release]
 debug = true
